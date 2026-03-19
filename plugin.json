@@ -1,0 +1,99 @@
+{
+  "name": "mijia-smart-reminder",
+  "version": "1.0.0",
+  "description": "米家智能设备语音提醒插件 - 通过小爱音箱进行定时语音播报",
+  "author": "WorkBuddy 社区",
+  "license": "MIT",
+  "homepage": "https://github.com/workbuddy-plugins/mijia-smart-reminder",
+  "keywords": [
+    "米家",
+    "小爱音箱",
+    "智能家居",
+    "语音提醒",
+    "定时播报",
+    "智能设备",
+    "workbuddy",
+    "codebuddy"
+  ],
+  "capabilities": [
+    "skills",
+    "commands",
+    "automations"
+  ],
+  "target": {
+    "system": ["macOS", "Windows", "Linux"],
+    "version": ">=2.0.0"
+  },
+  "skills": [
+    {
+      "name": "mijia-smart-reminder",
+      "description": "米家智能提醒专家 - 与米家智能设备（小爱音箱等）连接，将定时提醒项目通过语音播报。支持自定义提醒内容、时间设置、设备选择。使用前需简单配置米家账号。",
+      "path": "skills/mijia-smart-reminder"
+    }
+  ],
+  "commands": [
+    {
+      "name": "mijia-setup",
+      "description": "配置米家账号和设备连接",
+      "path": "commands/mijia-setup.yaml"
+    },
+    {
+      "name": "mijia-add",
+      "description": "添加新的定时提醒",
+      "path": "commands/mijia-add.yaml"
+    },
+    {
+      "name": "mijia-list",
+      "description": "查看所有定时提醒",
+      "path": "commands/mijia-list.yaml"
+    },
+    {
+      "name": "mijia-status",
+      "description": "检查米家设备连接状态",
+      "path": "commands/mijia-status.yaml"
+    },
+    {
+      "name": "mijia-broadcast",
+      "description": "手动播报指定提醒",
+      "path": "commands/mijia-broadcast.yaml"
+    }
+  ],
+  "agents": [
+    {
+      "name": "mijia-assistant",
+      "description": "米家智能助手，提供对话式交互界面",
+      "path": "agents/mijia-assistant.md"
+    }
+  ],
+  "automations": [
+    {
+      "name": "mijia-reminder-checker",
+      "description": "定时检查并播报到期的提醒",
+      "path": "automations/mijia-reminder-checker.toml"
+    }
+  ],
+  "config": {
+    "autoInstall": true,
+    "autoUpdate": true,
+    "autoEnableSkills": true,
+    "dataPath": "${CODEBUDDY_PLUGIN_ROOT}/data",
+    "logsPath": "${CODEBUDDY_PLUGIN_ROOT}/data/logs"
+  },
+  "dependencies": {
+    "system": ["curl", "jq"],
+    "plugins": []
+  },
+  "permissions": {
+    "filesystem": ["read", "write"],
+    "network": true,
+    "shell": true
+  },
+  "screenshots": [
+    "assets/screenshot-1.png",
+    "assets/screenshot-2.png"
+  ],
+  "icons": {
+    "dark": "assets/icon-dark.svg",
+    "light": "assets/icon-light.svg"
+  }
+}

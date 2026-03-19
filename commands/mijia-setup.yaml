@@ -1,0 +1,121 @@
+name: mijia-setup
+description: 配置米家账号和设备连接
+category: 米家智能提醒
+icon: settings
+color: blue
+
+# 命令参数
+arguments:
+  - name: account
+    type: string
+    description: 米家账号（邮箱或手机号）
+    required: false
+    prompt: 请输入米家账号
+  - name: server
+    type: string
+    description: 服务器区域（cn, us, eu, in）
+    required: false
+    default: cn
+    options:
+      - label: 中国
+        value: cn
+      - label: 美国
+        value: us
+      - label: 欧洲
+        value: eu
+      - label: 印度
+        value: in
+  - name: interactive
+    type: boolean
+    description: 是否使用交互式配置
+    required: false
+    default: true
+
+# 命令执行逻辑
+execution:
+  type: bash
+  script: |
+    #!/bin/bash
+    
+    # 获取插件根目录
+    if [ -n "$CODEBUDDY_PLUGIN_ROOT" ]; then
+        PLUGIN_ROOT="$CODEBUDDY_PLUGIN_ROOT"
+    else
+        PLUGIN_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+    fi
+    
+    SCRIPT_PATH="$PLUGIN_ROOT/skills/mijia-smart-reminder/scripts/setup-mijia.sh"
+    
+    # 检查脚本是否存在
+    if [ ! -f "$SCRIPT_PATH" ]; then
+        echo "❌ 找不到配置脚本"
+        echo "请确保插件已正确安装"
+        exit 1
+    fi
+    
+    # 检查是否提供参数
+    if [ -n "$account" ] && [ "$interactive" = "false" ]; then
+        echo "🔧 使用参数配置米家账号..."
+        
+        if [ -z "$account" ]; then
+            echo "❌ 账号不能为空"
+            exit 1
+        fi
+        
+        # 这里应该调用实际的配置逻辑
+        # 为了演示，我们创建配置文件
+        CONFIG_DIR="$PLUGIN_ROOT/data"
+        CONFIG_FILE="$CONFIG_DIR/config.json"
+        
+        mkdir -p "$CONFIG_DIR"
+        
+        cat > "$CONFIG_FILE" << EOF
+{
+  "version": "1.0.0",
+  "mijia": {
+    "username": "$account",
+    "server": "$server",
+    "auth_time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  },
+  "settings": {
+    "volume": 60,
+    "repeat_count": 2,
+    "repeat_interval": 2
+  }
+}
+EOF
+        
+        echo "✅ 配置已保存"
+        echo "账号: $account"
+        echo "服务器: $server"
+        echo "配置文件: $CONFIG_FILE"
+        
+    else
+        echo "🔧 启动交互式配置向导..."
+        echo "请按照提示输入米家账号信息"
+        echo ""
+        
+        # 执行交互式脚本
+        bash "$SCRIPT_PATH"
+    fi
+
+# 命令帮助信息
+help: |
+  配置米家智能设备连接
+  
+  使用示例：
+  1. 交互式配置：`/mijia-setup`
+  2. 快速配置：`/mijia-setup account=user@example.com server=cn interactive=false`
+  
+  参数说明：
+  - account: 米家账号（邮箱或手机号）
+  - server: 服务器区域（cn/us/eu/in）
+  - interactive: 是否使用交互式界面（默认true）
+  
+  配置完成后，可以使用 `/mijia-status` 检查连接状态。
+
+# 命令输出格式
+output:
+  format: markdown
+  show_timestamps: true
+  show_success: true

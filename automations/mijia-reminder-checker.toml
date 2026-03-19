@@ -1,0 +1,94 @@
+name = "米家定时提醒检查"
+description = "定时检查并播报到期的提醒"
+status = "ACTIVE"
+
+# 执行计划：每分钟检查一次
+rrule = "FREQ=MINUTELY;INTERVAL=1"
+
+# 工作目录
+cwds = [
+  "${CODEBUDDY_PLUGIN_ROOT}"
+]
+
+# 任务提示
+prompt = """
+检查米家提醒并播报到期的提醒
+
+执行步骤：
+1. 检查插件数据目录是否存在：${CODEBUDDY_PLUGIN_ROOT}/data
+2. 读取提醒文件：${CODEBUDDY_PLUGIN_ROOT}/data/reminders.json
+3. 查找当前时间到期的激活提醒
+4. 对每个到期提醒执行播报
+5. 更新提醒状态（如一次性提醒标记为completed）
+6. 记录播报日志
+
+注意事项：
+- 只处理状态为"active"的提醒
+- 对于重复提醒，计算下一次播报时间
+- 记录所有操作到日志文件
+- 如果播报失败，记录错误并尝试重试
+
+输出要求：
+- 显示检查的提醒数量
+- 显示播报的提醒数量
+- 显示任何错误信息
+- 记录到日志文件
+"""
+
+# 环境变量
+[env]
+PLUGIN_ROOT = "${CODEBUDDY_PLUGIN_ROOT}"
+DATA_DIR = "${CODEBUDDY_PLUGIN_ROOT}/data"
+LOGS_DIR = "${CODEBUDDY_PLUGIN_ROOT}/data/logs"
+
+# 依赖检查
+[dependencies]
+scripts = [
+  "${CODEBUDDY_PLUGIN_ROOT}/skills/mijia-smart-reminder/scripts/broadcast-reminder.sh",
+  "${CODEBUDDY_PLUGIN_ROOT}/skills/mijia-smart-reminder/scripts/check-mijia-status.sh"
+]
+
+# 执行前检查
+[pre_checks]
+check_config = "test -f ${CODEBUDDY_PLUGIN_ROOT}/data/config.json"
+check_reminders = "test -f ${CODEBUDDY_PLUGIN_ROOT}/data/reminders.json"
+check_scripts = "test -f ${CODEBUDDY_PLUGIN_ROOT}/skills/mijia-smart-reminder/scripts/broadcast-reminder.sh"
+
+# 错误处理
+[error_handling]
+max_retries = 3
+retry_delay = 10
+on_failure = "log_error"
+notify_on_failure = false
+
+# 日志配置
+[logging]
+level = "INFO"
+file = "${CODEBUDDY_PLUGIN_ROOT}/data/logs/automation.log"
+max_size = "10MB"
+backup_count = 5
+
+# 性能限制
+[performance]
+max_execution_time = 30
+max_reminders_per_check = 50
+concurrent_broadcasts = 1
+
+# 通知设置
+[notifications]
+enabled = false
+# webhook_url = "https://example.com/webhook"
+# email = "user@example.com"
+
+# 测试模式
+[test_mode]
+enabled = false
+simulate_broadcast = true
+log_only = true
+
+# 版本信息
+[metadata]
+version = "1.0.0"
+created = "2024-03-20"
+author = "WorkBuddy Plugin System"
+plugin = "mijia-smart-reminder"

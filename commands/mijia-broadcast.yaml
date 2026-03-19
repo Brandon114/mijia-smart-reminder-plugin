@@ -1,0 +1,160 @@
+name: mijia-broadcast
+description: 手动播报指定提醒
+category: 米家智能提醒
+icon: volume-up
+color: red
+
+# 命令参数
+arguments:
+  - name: id
+    type: string
+    description: 提醒 ID（使用 /mijia-list 查看）
+    required: true
+    prompt: 请输入要播报的提醒 ID
+  - name: test_mode
+    type: boolean
+    description: 测试模式（不实际发送到设备）
+    required: false
+    default: false
+  - name: force
+    type: boolean
+    description: 强制播报（即使提醒未激活）
+    required: false
+    default: false
+
+# 命令执行逻辑
+execution:
+  type: bash
+  script: |
+    #!/bin/bash
+    
+    # 获取插件根目录
+    if [ -n "$CODEBUDDY_PLUGIN_ROOT" ]; then
+        PLUGIN_ROOT="$CODEBUDDY_PLUGIN_ROOT"
+    else
+        PLUGIN_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+    fi
+    
+    SCRIPT_PATH="$PLUGIN_ROOT/skills/mijia-smart-reminder/scripts/broadcast-reminder.sh"
+    DATA_DIR="$PLUGIN_ROOT/data"
+    REMINDERS_FILE="$DATA_DIR/reminders.json"
+    LOGS_DIR="$DATA_DIR/logs"
+    
+    # 检查提醒文件
+    if [ ! -f "$REMINDERS_FILE" ]; then
+        echo "❌ 提醒文件不存在"
+        echo "请先创建提醒: /mijia-add"
+        exit 1
+    fi
+    
+    # 查找指定 ID 的提醒
+    if command -v jq > /dev/null 2>&1; then
+        REMINDER=$(jq ".[] | select(.id == \"$id\")" "$REMINDERS_FILE")
+        
+        if [ -z "$REMINDER" ] || [ "$REMINDER" = "null" ]; then
+            echo "❌ 找不到 ID 为 $id 的提醒"
+            echo "请使用 /mijia-list 查看所有提醒"
+            exit 1
+        fi
+        
+        # 提取提醒信息
+        CONTENT=$(echo "$REMINDER" | jq -r '.content')
+        TIME=$(echo "$REMINDER" | jq -r '.time')
+        STATUS=$(echo "$REMINDER" | jq -r '.status')
+        DEVICE=$(echo "$REMINDER" | jq -r '.device // "默认设备"')
+        
+        echo "📢 准备播报提醒"
+        echo "  • ID: $id"
+        echo "  • 内容: $CONTENT"
+        echo "  • 计划时间: $TIME"
+        echo "  • 状态: $STATUS"
+        echo "  • 设备: $DEVICE"
+        echo "  • 模式: $([ "$test_mode" = "true" ] && echo "测试" || echo "实际播报")"
+        echo ""
+        
+        # 检查提醒状态
+        if [ "$STATUS" != "active" ] && [ "$force" != "true" ]; then
+            echo "⚠️  提醒状态为 $STATUS"
+            read -p "是否强制播报？(y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                echo "操作取消"
+                exit 0
+            fi
+        fi
+        
+        # 创建日志目录
+        mkdir -p "$LOGS_DIR"
+        
+        # 记录日志
+        LOG_ENTRY="$(date -u +%Y-%m-%dT%H:%M:%SZ) | ID: $id | 内容: $CONTENT | 设备: $DEVICE | 模式: $([ "$test_mode" = "true" ] && echo "测试" || echo "实际播报")"
+        echo "$LOG_ENTRY" >> "$LOGS_DIR/broadcast-log.txt"
+        
+        # 执行播报脚本
+        if [ -f "$SCRIPT_PATH" ]; then
+            if [ "$test_mode" = "true" ]; then
+                echo "🟡 测试模式 - 不会实际发送到设备"
+                echo "📋 播报内容预览："
+                echo "  \"小爱同学，请播报提醒：$CONTENT\""
+                echo ""
+                echo "✅ 播报测试完成"
+            else
+                echo "🔊 开始播报..."
+                bash "$SCRIPT_PATH" "$id"
+                
+                if [ $? -eq 0 ]; then
+                    echo "✅ 播报成功"
+                    
+                    # 更新提醒状态（如果是一次性提醒）
+                    if echo "$REMINDER" | jq -r '.repeat' | grep -q "once"; then
+                        echo "🔄 更新一次性提醒状态..."
+                        
+                        # 更新提醒状态为 completed
+                        jq "(.[] | select(.id == \"$id\")).status = \"completed\"" "$REMINDERS_FILE" > "$REMINDERS_FILE.tmp" && mv "$REMINDERS_FILE.tmp" "$REMINDERS_FILE"
+                        echo "📝 提醒已标记为 completed"
+                    fi
+                    
+                else
+                    echo "❌ 播报失败"
+                    echo "⚠️  请检查设备连接状态"
+                fi
+            fi
+        else
+            echo "❌ 找不到播报脚本"
+            echo "脚本路径: $SCRIPT_PATH"
+            exit 1
+        fi
+        
+    else
+        echo "❌ 需要 jq 工具来处理提醒数据"
+        echo "请安装 jq: brew install jq 或 apt-get install jq"
+        exit 1
+    fi
+    
+    echo ""
+    echo "日志记录在: $LOGS_DIR/broadcast-log.txt"
+
+# 命令帮助信息
+help: |
+  手动播报指定的提醒
+  
+  使用示例：
+  1. 播报提醒：`/mijia-broadcast id=123456789`
+  2. 测试播报：`/mijia-broadcast id=123456789 test_mode=true`
+  3. 强制播报：`/mijia-broadcast id=123456789 force=true`
+  
+  使用步骤：
+  1. 首先使用 `/mijia-list` 查看所有提醒及其 ID
+  2. 选择要播报的提醒 ID
+  3. 使用此命令进行播报
+  
+  注意事项：
+  - 确保设备已连接并在线
+  - 一次性提醒在播报后会自动标记为 completed
+  - 日志文件记录所有播报操作
+
+# 输出格式
+output:
+  format: markdown
+  show_timestamps: true
+  show_success: true

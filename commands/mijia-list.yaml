@@ -1,0 +1,159 @@
+name: mijia-list
+description: 查看所有定时提醒
+category: 米家智能提醒
+icon: list
+color: purple
+
+# 命令参数
+arguments:
+  - name: status
+    type: string
+    description: 筛选提醒状态
+    required: false
+    default: all
+    options:
+      - label: 全部
+        value: all
+      - label: 激活
+        value: active
+      - label: 已完成
+        value: completed
+      - label: 已取消
+        value: cancelled
+  - name: format
+    type: string
+    description: 输出格式
+    required: false
+    default: table
+    options:
+      - label: 表格
+        value: table
+      - label: 列表
+        value: list
+      - label: JSON
+        value: json
+  - name: limit
+    type: number
+    description: 显示数量限制
+    required: false
+    default: 20
+  - name: sort
+    type: string
+    description: 排序字段
+    required: false
+    default: created_at
+    options:
+      - label: 创建时间
+        value: created_at
+      - label: 提醒时间
+        value: next_broadcast
+      - label: 优先级
+        value: priority
+
+# 命令执行逻辑
+execution:
+  type: bash
+  script: |
+    #!/bin/bash
+    
+    # 获取插件根目录
+    if [ -n "$CODEBUDDY_PLUGIN_ROOT" ]; then
+        PLUGIN_ROOT="$CODEBUDDY_PLUGIN_ROOT"
+    else
+        PLUGIN_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+    fi
+    
+    DATA_DIR="$PLUGIN_ROOT/data"
+    REMINDERS_FILE="$DATA_DIR/reminders.json"
+    
+    # 检查提醒文件
+    if [ ! -f "$REMINDERS_FILE" ]; then
+        echo "📭 还没有任何提醒"
+        echo "使用命令: /mijia-add 创建第一个提醒"
+        exit 0
+    fi
+    
+    # 读取提醒数据
+    if command -v jq > /dev/null 2>&1; then
+        # 筛选提醒
+        if [ "$status" = "all" ]; then
+            REMINDERS=$(jq '.' "$REMINDERS_FILE")
+        else
+            REMINDERS=$(jq "[.[] | select(.status == \"$status\")]" "$REMINDERS_FILE")
+        fi
+        
+        # 排序
+        if [ "$sort" = "created_at" ]; then
+            REMINDERS=$(echo "$REMINDERS" | jq "sort_by(.created_at) | reverse")
+        elif [ "$sort" = "next_broadcast" ]; then
+            REMINDERS=$(echo "$REMINDERS" | jq "sort_by(.next_broadcast)")
+        elif [ "$sort" = "priority" ]; then
+            # 优先级排序：high > medium > low
+            REMINDERS=$(echo "$REMINDERS" | jq "sort_by(.priority) | map(.priority) | index([\"high\", \"medium\", \"low\"])")
+        fi
+        
+        # 限制数量
+        REMINDERS_COUNT=$(echo "$REMINDERS" | jq length)
+        REMINDERS=$(echo "$REMINDERS" | jq ".[0:$limit]")
+        
+    else
+        # 如果没有 jq，显示简单信息
+        echo "ℹ️  需要安装 jq 工具以获得更好的显示效果"
+        echo "当前提醒文件: $REMINDERS_FILE"
+        echo "提醒数量: $(wc -l < "$REMINDERS_FILE")"
+        exit 0
+    fi
+    
+    # 根据格式输出
+    if [ "$format" = "json" ]; then
+        echo "$REMINDERS"
+        
+    elif [ "$format" = "list" ]; then
+        echo "📋 提醒列表（共 $REMINDERS_COUNT 个）"
+        echo ""
+        
+        echo "$REMINDERS" | jq -r '.[] | "  • ID: \(.id) | 内容: \(.content) | 时间: \(.time) | 状态: \(.status)"'
+        
+    else # table 格式
+        echo "📊 提醒列表"
+        echo "总计: $REMINDERS_COUNT 个提醒 | 显示: $(echo "$REMINDERS" | jq length) 个"
+        echo ""
+        
+        # 创建表格
+        echo "| ID | 内容 | 时间 | 重复 | 优先级 | 状态 |"
+        echo "|----|------|------|------|--------|------|"
+        
+        echo "$REMINDERS" | jq -r '.[] | "| \(.id) | \(.content) | \(.time) | \(.repeat) | \(.priority) | \(.status) |"'
+        
+    fi
+    
+    echo ""
+    echo "使用命令："
+    echo "  • 添加提醒: /mijia-add"
+    echo "  • 修改提醒: /mijia-update <id>"
+    echo "  • 删除提醒: /mijia-remove <id>"
+    echo "  • 播报提醒: /mijia-broadcast <id>"
+
+# 命令帮助信息
+help: |
+  查看和管理所有定时提醒
+  
+  使用示例：
+  1. 查看全部：`/mijia-list`
+  2. 只看激活的：`/mijia-list status=active`
+  3. JSON格式：`/mijia-list format=json`
+  4. 按时间排序：`/mijia-list sort=next_broadcast`
+  
+  提醒状态说明：
+  - active: 激活的提醒
+  - completed: 已完成的提醒
+  - cancelled: 已取消的提醒
+  
+  修改提醒：`/mijia-update <id> [options]`
+  删除提醒：`/mijia-remove <id>`
+
+# 输出格式
+output:
+  format: markdown
+  show_timestamps: true
+  show_success: true

@@ -1,0 +1,149 @@
+name: mijia-status
+description: 检查米家设备连接状态
+category: 米家智能提醒
+icon: wifi
+color: orange
+
+# 命令参数
+arguments:
+  - name: detail
+    type: boolean
+    description: 显示详细信息
+    required: false
+    default: false
+  - name: check_devices
+    type: boolean
+    description: 检查设备在线状态
+    required: false
+    default: true
+
+# 命令执行逻辑
+execution:
+  type: bash
+  script: |
+    #!/bin/bash
+    
+    # 获取插件根目录
+    if [ -n "$CODEBUDDY_PLUGIN_ROOT" ]; then
+        PLUGIN_ROOT="$CODEBUDDY_PLUGIN_ROOT"
+    else
+        PLUGIN_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+    fi
+    
+    SCRIPT_PATH="$PLUGIN_ROOT/skills/mijia-smart-reminder/scripts/check-mijia-status.sh"
+    DATA_DIR="$PLUGIN_ROOT/data"
+    CONFIG_FILE="$DATA_DIR/config.json"
+    REMINDERS_FILE="$DATA_DIR/reminders.json"
+    LOGS_DIR="$DATA_DIR/logs"
+    
+    echo "🔍 米家智能提醒 - 状态检查"
+    echo ""
+    
+    # 检查配置文件
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "❌ 配置文件不存在"
+        echo "请先运行: /mijia-setup"
+        exit 1
+    fi
+    
+    echo "📁 插件目录: $PLUGIN_ROOT"
+    echo "📁 数据目录: $DATA_DIR"
+    echo ""
+    
+    # 读取配置信息
+    if command -v jq > /dev/null 2>&1; then
+        CONFIG_INFO=$(jq '.mijia' "$CONFIG_FILE")
+        USERNAME=$(echo "$CONFIG_INFO" | jq -r '.username')
+        SERVER=$(echo "$CONFIG_INFO" | jq -r '.server')
+        PRIMARY_DEVICE=$(echo "$CONFIG_INFO" | jq -r '.primary_device')
+        AUTH_TIME=$(echo "$CONFIG_INFO" | jq -r '.auth_time')
+        
+        echo "📋 配置信息："
+        echo "  • 账号: $USERNAME"
+        echo "  • 服务器: $SERVER"
+        echo "  • 主播报设备: $PRIMARY_DEVICE"
+        echo "  • 认证时间: $AUTH_TIME"
+        echo ""
+        
+    else
+        echo "ℹ️  配置文件存在，需要 jq 来解析详细信息"
+        echo "文件: $CONFIG_FILE"
+        echo ""
+    fi
+    
+    # 检查提醒文件
+    if [ -f "$REMINDERS_FILE" ]; then
+        if command -v jq > /dev/null 2>&1; then
+            REMINDER_COUNT=$(jq length "$REMINDERS_FILE")
+            ACTIVE_COUNT=$(jq '[.[] | select(.status == "active")] | length' "$REMINDERS_FILE")
+            
+            echo "📊 提醒统计："
+            echo "  • 总计提醒: $REMINDER_COUNT"
+            echo "  • 激活提醒: $ACTIVE_COUNT"
+            echo "  • 文件大小: $(du -h "$REMINDERS_FILE" | cut -f1)"
+            echo ""
+        fi
+    else
+        echo "📭 提醒文件不存在（尚无提醒）"
+        echo ""
+    fi
+    
+    # 检查日志目录
+    if [ -d "$LOGS_DIR" ]; then
+        LOG_COUNT=$(ls -1 "$LOGS_DIR" 2>/dev/null | wc -l)
+        echo "📄 日志统计："
+        echo "  • 日志目录: $LOGS_DIR"
+        echo "  • 日志文件数: $LOG_COUNT"
+        echo ""
+        
+        if [ "$detail" = "true" ] && [ $LOG_COUNT -gt 0 ]; then
+            echo "📋 最近日志："
+            ls -lt "$LOGS_DIR" | head -5
+            echo ""
+        fi
+    fi
+    
+    # 检查设备状态
+    if [ "$check_devices" = "true" ]; then
+        echo "🔌 设备连接检查..."
+        
+        if [ -f "$SCRIPT_PATH" ]; then
+            bash "$SCRIPT_PATH"
+        else
+            echo "⚠️  找不到设备检查脚本"
+            echo "脚本路径: $SCRIPT_PATH"
+        fi
+    fi
+    
+    echo "✅ 状态检查完成"
+    echo ""
+    echo "快速操作："
+    echo "  • 重新配置: /mijia-setup"
+    echo "  • 添加提醒: /mijia-add"
+    echo "  • 查看提醒: /mijia-list"
+    echo "  • 手动播报: /mijia-broadcast"
+
+# 命令帮助信息
+help: |
+  检查米家设备连接状态和插件运行情况
+  
+  使用示例：
+  1. 基础检查：`/mijia-status`
+  2. 详细信息：`/mijia-status detail=true`
+  3. 跳过设备检查：`/mijia-status check_devices=false`
+  
+  检查内容包括：
+  - 配置文件状态
+  - 提醒统计数据
+  - 日志文件信息
+  - 设备连接状态
+  
+  常见问题：
+  - 配置文件丢失：运行 `/mijia-setup`
+  - 设备连接失败：检查网络和小爱音箱状态
+
+# 输出格式
+output:
+  format: markdown
+  show_timestamps: true
+  show_success: true

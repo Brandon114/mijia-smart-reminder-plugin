@@ -1,0 +1,179 @@
+name: mijia-add
+description: 添加新的定时提醒
+category: 米家智能提醒
+icon: bell
+color: green
+
+# 命令参数
+arguments:
+  - name: content
+    type: string
+    description: 提醒内容
+    required: true
+    prompt: 请输入提醒内容
+  - name: time
+    type: string
+    description: 提醒时间（格式：HH:MM 或 相对时间如 "tomorrow 15:00"）
+    required: true
+    prompt: 请输入提醒时间
+  - name: repeat
+    type: string
+    description: 重复类型
+    required: false
+    default: once
+    options:
+      - label: 一次性
+        value: once
+      - label: 每天
+        value: daily
+      - label: 工作日
+        value: weekdays
+      - label: 每周
+        value: weekly
+      - label: 每月
+        value: monthly
+  - name: day_of_week
+    type: string
+    description: 每周几（当repeat=weekly时使用）
+    required: false
+    options:
+      - label: 周一
+        value: monday
+      - label: 周二
+        value: tuesday
+      - label: 周三
+        value: wednesday
+      - label: 周四
+        value: thursday
+      - label: 周五
+        value: friday
+      - label: 周六
+        value: saturday
+      - label: 周日
+        value: sunday
+  - name: device
+    type: string
+    description: 播报设备名称
+    required: false
+  - name: priority
+    type: string
+    description: 优先级
+    required: false
+    default: medium
+    options:
+      - label: 高
+        value: high
+      - label: 中
+        value: medium
+      - label: 低
+        value: low
+
+# 命令执行逻辑
+execution:
+  type: bash
+  script: |
+    #!/bin/bash
+    
+    # 获取插件根目录
+    if [ -n "$CODEBUDDY_PLUGIN_ROOT" ]; then
+        PLUGIN_ROOT="$CODEBUDDY_PLUGIN_ROOT"
+    else
+        PLUGIN_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+    fi
+    
+    SCRIPT_PATH="$PLUGIN_ROOT/skills/mijia-smart-reminder/scripts/add-reminder.sh"
+    DATA_DIR="$PLUGIN_ROOT/data"
+    REMINDERS_FILE="$DATA_DIR/reminders.json"
+    CONFIG_FILE="$DATA_DIR/config.json"
+    
+    # 检查配置
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "❌ 请先配置米家账号"
+        echo "使用命令: /mijia-setup"
+        exit 1
+    fi
+    
+    # 检查脚本
+    if [ ! -f "$SCRIPT_PATH" ]; then
+        echo "❌ 找不到添加提醒脚本"
+        exit 1
+    fi
+    
+    # 如果直接调用脚本
+    if [ -n "$content" ] && [ -n "$time" ]; then
+        echo "📝 创建提醒..."
+        echo "内容: $content"
+        echo "时间: $time"
+        echo "重复: $repeat"
+        echo "优先级: $priority"
+        
+        # 创建提醒 JSON
+        REMINDER_ID=$(date +%s%N | cut -b1-13)
+        CURRENT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        
+        # 创建提醒数据
+        REMINDER_JSON=$(cat << EOF
+{
+  "id": "$REMINDER_ID",
+  "content": "$content",
+  "time": "$time",
+  "repeat": "$repeat",
+  "device": "$device",
+  "priority": "$priority",
+  "status": "active",
+  "created_at": "$CURRENT_TIME",
+  "last_broadcast": null,
+  "next_broadcast": "$(date -u +%Y-%m-%dT%H:%M:%SZ -d "+1 hour")"
+}
+EOF
+        )
+        
+        # 添加到提醒列表
+        mkdir -p "$DATA_DIR"
+        
+        if [ ! -f "$REMINDERS_FILE" ]; then
+            echo "[$REMINDER_JSON]" > "$REMINDERS_FILE"
+        else
+            # 使用 jq 添加提醒
+            if command -v jq > /dev/null 2>&1; then
+                jq ". + [$REMINDER_JSON]" "$REMINDERS_FILE" > "$REMINDERS_FILE.tmp" && mv "$REMINDERS_FILE.tmp" "$REMINDERS_FILE"
+            else
+                # 如果没有 jq，使用简单的方法
+                sed -i '' 's/\]$//' "$REMINDERS_FILE"
+                echo ",$REMINDER_JSON]" >> "$REMINDERS_FILE"
+            fi
+        fi
+        
+        echo "✅ 提醒创建成功"
+        echo "ID: $REMINDER_ID"
+        echo "文件: $REMINDERS_FILE"
+        
+    else
+        # 启动交互式脚本
+        echo "🔧 启动交互式提醒创建..."
+        bash "$SCRIPT_PATH"
+    fi
+
+# 命令帮助信息
+help: |
+  添加定时提醒到米家小爱音箱
+  
+  使用示例：
+  1. 简单提醒：`/mijia-add content="站会时间" time="09:00"`
+  2. 每天提醒：`/mijia-add content="吃药" time="08:00" repeat=daily`
+  3. 工作日提醒：`/mijia-add content="提交日报" time="18:00" repeat=weekdays`
+  4. 指定设备：`/mijia-add content="起床" time="07:00" repeat=daily device="卧室音箱"`
+  
+  时间格式：
+  - 绝对时间：HH:MM（如 09:00）
+  - 相对时间：tomorrow 15:00, next monday 10:00
+  - 日期时间：2024-03-20 15:30
+  
+  查看提醒：`/mijia-list`
+  删除提醒：`/mijia-remove <id>`
+
+# 输出格式
+output:
+  format: markdown
+  show_timestamps: true
+  show_success: true
