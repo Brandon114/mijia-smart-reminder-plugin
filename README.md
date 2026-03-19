@@ -234,8 +234,8 @@ npm run test:integration
 
 ## 📞 支持与反馈
 
-- 问题报告：x1148894@gmail.com
-- 功能请求：x1148894@gmail.com
+- 问题报告：x1148894@foxmail.com
+- 功能请求：x1148894@foxmail.com
 - 文档：[Wiki](https://github.com/workbuddy-plugins/mijia-smart-reminder/wiki)
 
 ## 🙏 致谢
